@@ -18,30 +18,36 @@ def clean_text(text):
     
     return text.strip()
 
+def cutoff(text):
+    point = text.find("Co-Defendants")
+    if point != -1:
+        text = text[:point].strip()
+    return text
+
 def extract_inmate_info(text):
     text = clean_text(text)
+    text = cutoff(text)
     
     inmate_info = {
         "Name": "",
         "Date Received": "",
-        "Age when Received": "",
         "Education Level": "",
         "Date of Offense": "",
-        "Age at the time of Offense": "",
         "Prior Occupation": "",
         "Prior Prison Record": "",
         "Summary of Incident": "",
     }
+    name_match = re.match(r"Name[:\-]?\s*([A-Za-z]+(?: [A-Za-z]+)*)", text)
+    if name_match:
+        inmate_info["Name"] = name_match.group(1).strip()
     
     patterns = {
-        "Name": r"Name[:\-]?\s*([^,]+)",
+        "Name": r"Name[:\-]?\s*([A-Za-z]+(?: [A-Za-z]+)*)",
         "Date Received": r"Date Received[:\-]?\s*(\d{1,2}/\d{1,2}/\d{2,4})",
-        "Age when Received": r"Age when Received[:\-]?\s*(\d+)",
-        "Education Level": r"Education Level[:\-]?\s*(.*?)\s*(?:Date|Age|Prior|Summary|$)",
+        "Education Level": r"Education Level[:\-]?\s*(\d+)",
         "Date of Offense": r"Date of Offense[:\-]?\s*(\d{1,2}/\d{1,2}/\d{2,4})",
-        "Age at the time of Offense": r"Age at the time of Offense[:\-]?\s*(\d+)",
-        "Prior Occupation": r"Prior Occupation[:\-]?\s*(.*?)\s*(?:Prior|Summary|$)",
-        "Prior Prison Record": r"Prior Prison Record[:\-]?\s*(.*?)\s*(?:Summary|$)",
+        "Prior Occupation": r"Prior Occupation[:\-]?\s*(.*?)(?:,| Prior| Summary|$)",
+        "Prior Prison Record": r"Prior Prison Record[:\-]?\s*(.*?)(?: Summary|$)",
         "Summary of Incident": r"Summary of Incident[:\-]?\s*(.*)"
     }
     
@@ -57,8 +63,8 @@ def process_csv(input_file, output_file):
         reader = csv.reader(infile)
         writer = csv.writer(outfile)
         
-        header = ["Execution Number", "Name", "Date Received", "Age when Received", 
-                  "Education Level", "Date of Offense", "Age at the time of Offense", 
+        header = ["Execution Number", "Name", "Date Received", 
+                  "Education Level", "Date of Offense",  
                   "Prior Occupation", "Prior Prison Record", "Summary of Incident"]
         writer.writerow(header)
 
@@ -69,20 +75,22 @@ def process_csv(input_file, output_file):
             
             if "Death Row Information" in info:
                 inmate_info = extract_inmate_info(info)
+                
+                # Ensure correct alignment
+                if any(c.isalpha() for c in execution_number) and not inmate_info["Name"]:
+                    inmate_info["Name"] = execution_number
+                    execution_number = ""
+                
                 writer.writerow([
                     execution_number,
                     inmate_info.get("Name", ""),
                     inmate_info.get("Date Received", ""),
-                    inmate_info.get("Age when Received", ""),
                     inmate_info.get("Education Level", ""),
                     inmate_info.get("Date of Offense", ""),
-                    inmate_info.get("Age at the time of Offense", ""),
                     inmate_info.get("Prior Occupation", ""),
                     inmate_info.get("Prior Prison Record", ""),
                     inmate_info.get("Summary of Incident", "")
                 ])
-
-
 
 if __name__ == "__main__":
     input_csv = "DATA/inmate_info.csv"
